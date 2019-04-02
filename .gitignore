@@ -1,0 +1,6 @@
+isodir/*
+compiler/*
+build_output/*
+source/*
+*.iso
+*.bin
