@@ -112,7 +112,10 @@ char *exception_messages[] =
         "Reserved"
     };
 
-
+/*
+ * Handler for all ISR's, currently just prints error message
+ * to screen if interrupt is one of the 32 reserved interrupts.
+ */
 void fault_handler(struct regs *r)
 {
         if (r->int_no < 32) {

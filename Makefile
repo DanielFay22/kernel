@@ -2,24 +2,27 @@
 
 OFORMAT = elf32
 FILES = main.o scrn.o start.o kernel.bin
-CFLAGS = -Wall -O -fstrength-reduce -fomit-frame-pointer \
+CFLAGS = -Wall -O0 -fstrength-reduce -fomit-frame-pointer \
 	-finline-functions -nostdinc -fno-builtin -I ./include -c
 
-CC = /mnt/c/Users/Daniel/CLionProjects/kernel/compiler/bin/i686-elf-gcc
-OBJECTS = main.o scrn.o start.o gdt.o idt.o isrs.o irq.o timer.o keyboard.o
+DIR = /mnt/c/Users/Daniel/CLionProjects/kernel
+CC = $(DIR)/compiler/bin/i686-elf-gcc
+LINK = $(DIR)/resources/link.ld
+OBJECTS = main.o scrn.o start.o gdt.o idt.o isrs.o irq.o timer.o keyboard.o malloc.o string.o swi.o
 
 
 
-all: $(OBJECTS) kernel image build_cleanup
+all: kernel.iso
 
-kernel: $(OBJECTS)
-	$(CC) -T link.ld -o kernel.bin -ffreestanding -nostdlib $(OBJECTS) -lgcc
+kernel.bin: $(OBJECTS)
+	$(CC) -T $(LINK) -o kernel.bin -ffreestanding -nostdlib $(OBJECTS) -lgcc
 
-image:
+kernel.iso: kernel.bin
 	mkdir -p isodir/boot/grub
 	cp kernel.bin isodir/boot/kernel.bin
-	cp grub.cfg isodir/boot/grub/grub.cfg
+	cp resources/grub.cfg isodir/boot/grub/grub.cfg
 	grub-mkrescue -o kernel.iso isodir
+	rm -r isodir/
 
 start.o: start.asm
 	nasm -f$(OFORMAT) -o start.o start.asm
@@ -48,10 +51,24 @@ timer.o: timer.c
 keyboard.o: keyboard.c
 	$(CC) $(CFLAGS) -o keyboard.o keyboard.c
 
+#memory.o: memory.c
+#	$(CC) $(CFLAGS) -o memory.o memory.c
+
+malloc.o: malloc.c
+	$(CC) $(CFLAGS) -o malloc.o malloc.c
+
+string.o: string.c
+	$(CC) $(CFLAGS) -o string.o string.c
+
+swi.o: swi.c
+	$(CC) $(CFLAGS) -o swi.o swi.c
 
 build_cleanup:
 	mkdir -p build_output
 	mv *.o build_output
+	mv *.bin build_output
 
 clean:
 	rm -f $(OBJECTS) kernel.bin
+	rm -f *.iso
+	rm -rf isodir/

@@ -32,7 +32,8 @@ run:
     	extern main
     	call main
     	cli
-.hang:	hlt
+.hang:
+		hlt
     	jmp .hang
 
 
@@ -317,7 +318,7 @@ isr_common_stub:
     iret
 
 
-
+; IRQ's
 global irq0
 global irq1
 global irq2
@@ -462,9 +463,170 @@ irq_common_stub:
 
 
 
+global swi0
+global swi1
+global swi2
+global swi3
+global swi4
+global swi5
+global swi6
+global swi7
+global swi8
+global swi9
+global swi10
+global swi11
+global swi12
+global swi13
+global swi14
+global swi15
+
+;	PIT
+swi0:
+	cli
+	push 0
+	push 0x80
+	jmp swi_common_stub
+;	Keyboard
+swi1:
+	cli
+	push 0
+	push 0x81
+	jmp swi_common_stub
+
+swi2:
+	cli
+	push 0
+	push 0x82
+	jmp swi_common_stub
+
+swi3:
+	cli
+	push 0
+	push 0x83
+	jmp swi_common_stub
+
+swi4:
+	cli
+	push 0
+	push 0x84
+	jmp swi_common_stub
+
+swi5:
+	cli
+	push 0
+	push 0x85
+	jmp swi_common_stub
+
+swi6:
+	cli
+	push 0
+	push 0x86
+	jmp swi_common_stub
+
+swi7:
+	cli
+	push 0
+	push 0x87
+	jmp swi_common_stub
+
+swi8:
+	cli
+	push 0
+	push 0x88
+	jmp swi_common_stub
+
+swi9:
+	cli
+	push 0
+	push 0x89
+	jmp swi_common_stub
+
+swi10:
+	cli
+	push 0
+	push 0x8A
+	jmp swi_common_stub
+
+swi11:
+	cli
+	push 0
+	push 0x8B
+	jmp swi_common_stub
+
+swi12:
+	cli
+	push 0
+	push 0x8C
+	jmp swi_common_stub
+
+swi13:
+	cli
+	push 0
+	push 0x8D
+	jmp swi_common_stub
+
+swi14:
+	cli
+	push 0
+	push 0x8E
+	jmp swi_common_stub
+
+swi15:
+	cli
+	push 0
+	push 0x8F
+	jmp swi_common_stub
+
+
+extern swi_handler
+swi_common_stub:
+	pusha
+	push ds
+	push es
+	push fs
+	push gs
+	mov ax, 0x10
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov eax, esp
+	push eax
+	mov eax, swi_handler
+	call eax
+	pop eax
+	pop gs
+	pop fs
+	pop es
+	pop ds
+	popa
+	add esp, 8
+	iret
+
+
+
+
+
+; Uncomment to enable paging
+; Setup paging
+;extern pd
+;global paging_init
+;paging_init:
+;	mov eax, [pd]					; pointer to page directory
+;	mov cr3, eax
+;	mov	eax, cr0
+;	or	eax, 0x80000001				; protected mode is required for paging
+;	mov	cr0, eax
+;	ret
 
 
 SECTION .bss
 	align 16
-	resb 16384		; 16 KiB stack
+	resb 32768		; 32 KiB stack
 _sys_stack:
+	resb 32768
+
+	align 4096
+	global heap
+heap:
+	resb 1<<23		; Reserve 1 GiB of heap space

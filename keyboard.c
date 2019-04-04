@@ -1,5 +1,6 @@
 
 #include <system.h>
+#include <string.h>
 
 /*
  * Codes:
@@ -86,6 +87,8 @@ char *shift_lookup = "__!@#$%^&*()_+\b\tQWERTYUIOP{}\n_ASDFGHJKL:\"~_|ZXCVB"
 // Future: used to store commands to be sent on exit from IRQ.
 char command_queue[32];
 
+//char line_buffer[1024];
+
 
 void
 keypress_handler(struct regs *r)
@@ -138,12 +141,30 @@ keypress_handler(struct regs *r)
         case 88:
                 // Function handler
                 break;
+        case 28:
+                getcurline(line_buffer);
+                putch('\n');
+                GetInInterrupt(0x80);
+//                getprevline(line_buffer);
+//                for (unsigned int i = 0; i <= strlen(line); i ++)
+//                        *(line_buffer + i) = *(line + i);
 
+//                memcpy(line_buffer, line, strlen(line) + 1);
+//                puts(line_buffer);
+//                free(line);
+                break;
         default:
                 if (c <= 57)
                         putch(l[c]);
 
         }
+}
+
+
+void
+echo_line()
+{
+        puts(line_buffer);
 }
 
 
@@ -156,5 +177,9 @@ keyboard_init()
         for (int i = 0; i < 32; i ++)
                 command_queue[i] = 0;
 
+        line_buffer = malloc(sizeof(char) * 100);
+
         irq_install_handler(1, keypress_handler);
+
+        swi_install_handler(0, echo_line);
 }

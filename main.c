@@ -1,4 +1,7 @@
 #include <system.h>
+#include <malloc.h>
+
+extern char *line_buffer;
 
 void *
 memcpy(void *dest, const void *src, size_t count)
@@ -23,14 +26,6 @@ memsetw(unsigned short *dest, unsigned short val, size_t count)
         unsigned short *temp = (unsigned short *)dest;
         for( ; count != 0; count--) *temp++ = val;
         return dest;
-}
-
-size_t
-strlen(const char *str)
-{
-        size_t retval;
-        for(retval = 0; *str != '\0'; str++) retval++;
-        return retval;
 }
 
 // Assembly -- Reads from input port
@@ -64,19 +59,44 @@ main()
         // Setup IRQ handlers.
         irq_install();
 
+        swi_install();
+
+        heap_init();
+
         // Begin the system timer.
         timer_install();
         keyboard_init();
 
         // Allow interrupts to occur.
-        __asm__ __volatile__("sti");
+        ENABLE_INT;
 
         // Setup the screen output and print to screen.
         init_video();
         puts("Hello World!\n");
 
+        char *text = malloc(50);
+        text = "abcdefghijklmnopqrstuvwxyz\n";
+        puts(text);
+        free(text);
+
+
+
         // Infinite loop.
         for (;;);
+//        {
+//                // Line received
+//                while (line_buffer[0] == '\0');
+//
+//                line_buffer[80] = '\0'; // Ensure null terminated.
+//                unsigned int i;
+//                for (i = 0; line_buffer[i] != '\0'; i++)
+//                        putch(line_buffer[i]);
+////                puts(line_buffer);
+//
+//                // No reason to null fill whole array,
+//                // first byte will do.
+//                line_buffer[0] = '\0';
+//        }
 
 
         // Added to prevent compiler errors

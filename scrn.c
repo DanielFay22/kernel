@@ -1,5 +1,6 @@
 
 #include <system.h>
+#include <string.h>
 
 
 enum vga_color {
@@ -34,18 +35,25 @@ int csr_x = 0, csr_y = 0;
 void
 scroll(void)
 {
-        unsigned blank = 0x20 | (attrib << 8);
-        unsigned temp;
+//        unsigned int temp;
 
         if (csr_y >= SCRN_H) {
-                temp = csr_y - SCRN_H + 1;
+//                temp = csr_y - SCRN_H + 1;
+                memcpy(textmemptr, textmemptr + (SCRN_H - 1) * SCRN_W,
+                    sizeof(unsigned short) * SCRN_W);
+                memset(textmemptr + SCRN_W, 0x00,
+                    (SCRN_H - 1) * SCRN_W * sizeof(unsigned short));
+                csr_y = 1;
+                csr_x = 0;
 
-                memcpy(textmemptr, textmemptr + SCRN_W * temp,
-                    sizeof(unsigned short) * SCRN_W * (SCRN_H - temp));
-
-                memsetw(textmemptr + SCRN_W * (SCRN_H - temp), blank,
-                    SCRN_W * temp);
-                csr_y = SCRN_H - 1;
+//                memcpy(textmemptr, textmemptr + SCRN_W * temp,
+//                    sizeof(unsigned short) * SCRN_W * (SCRN_H - temp));
+//
+//                // Zero out the "newly added" lines.
+//                memset(textmemptr + SCRN_W * (SCRN_H - temp),
+//                    0x00, SCRN_W * temp * sizeof(unsigned short));
+//
+//                csr_y = SCRN_H - 1;
         }
 }
 
@@ -64,13 +72,7 @@ move_csr(void)
 /* Clears the screen */
 void cls()
 {
-        unsigned blank;
-        int i;
-
-        blank = 0x20 | (attrib << 8);
-
-        for(i = 0; i < SCRN_H; i++)
-                memsetw(textmemptr + i * SCRN_W, blank, SCRN_W);
+        memsetw(textmemptr, 0x20 | (attrib << 8), SCRN_W * SCRN_H);
 
         csr_x = 0;
         csr_y = 0;
@@ -81,33 +83,36 @@ void cls()
 void
 putch(char c)
 {
-        unsigned short *where;
-        unsigned att = attrib << 8;
+        unsigned short att = attrib << 8;
 
-        /* Handle a backspace, by moving the cursor back one space */
         switch (c) {
-        case 0x08:
+        case 0x08:      // Backspace
                 if(csr_x != 0) {
                         csr_x--;
-                        where = textmemptr + (csr_y * SCRN_W + csr_x);
-                        *where = 0x20 | att;
+                        *(textmemptr + (csr_y * SCRN_W + csr_x)) = 0x00;
+                } else if (csr_y != 0) {
+                        csr_y--;
+                        csr_x = SCRN_W - 1;
+                        *(textmemptr + (csr_y * SCRN_W + csr_x)) = 0x00;
                 }
                 break;
-        case 0x09:
+        case 0x09:      // TAB
                 csr_x = (csr_x + 8) & ~(8 - 1);
                 break;
         case '\r':
                 csr_x = 0;
                 break;
         case '\n':
+                // Zero out row
+                *(textmemptr + csr_x + SCRN_W * csr_y) = '\n';
+                memset(textmemptr + csr_x + csr_y * SCRN_W + 1, 0x00,
+                       sizeof(unsigned short) * (SCRN_W - csr_x));
                 csr_x = 0;
                 csr_y++;
                 break;
         default:
-                if(c >= ' ')
-                {
-                        where = textmemptr + (csr_y * SCRN_W + csr_x);
-                        *where = c | att;	/* Character AND attributes: color */
+                if (c >= ' ') {
+                        *(textmemptr + (csr_y * SCRN_W + csr_x)) = c | att;
                         csr_x++;
                 }
                 break;
@@ -116,8 +121,11 @@ putch(char c)
 
         /* If the cursor has reached the edge of the screen's width, we
         *  insert a new line */
-        if(csr_x >= SCRN_W)
-        {
+        if (csr_x == SCRN_W - 1) {
+                *(textmemptr + csr_x + SCRN_W * csr_y) = '\n';
+                csr_x = 0;
+                csr_y++;
+        } else if (csr_x >= SCRN_W) {
                 csr_x = 0;
                 csr_y++;
         }
@@ -131,8 +139,19 @@ putch(char c)
 void
 puts(char *text)
 {
-        for (unsigned int i = 0; i < strlen(text); i++)
-                putch(text[i]);
+        while (*text != '\0')
+                putch(*text++);
+}
+
+void
+putnum(unsigned int num)
+{
+        static char *digits = "0123456789";
+
+        while (num > 0) {
+                putch(digits[num % 10]);
+                num /= 10;
+        }
 }
 
 /* Sets the foreground and background color */
@@ -142,10 +161,55 @@ settextcolor(unsigned char forecolor, unsigned char backcolor)
         attrib = (backcolor << 4) | (forecolor & 0x0F);
 }
 
+void
+getline(unsigned int y, char *buf)
+{
+        unsigned int c;
+        for (c = 0; c < SCRN_W - 1; c++) {
+                *(buf + c) = (char) (*(textmemptr + c + y * SCRN_W) & 0xFF);
+                if (*(buf + c) == '\n') {
+                        *(buf + c + 1) = '\0';
+                        return;
+                }
+        }
+
+        *(buf + SCRN_W - 1) = '\0';
+        return;
+}
+
+void
+getcurline(char *buf)
+{
+        getline((unsigned int)csr_y, buf);
+}
+
+void
+getprevline(char *buf)
+{
+        if (csr_y > 0)
+                getline((unsigned int)(csr_y - 1), buf);
+        else
+                getline(0, buf);
+}
+
+
+void
+push_screen(struct regs *r)
+{
+        memcpy((unsigned short *)VGABUFFER, textmemptr,
+               sizeof(unsigned short) * SCRN_W * SCRN_H);
+}
+
+
 /* Sets text-mode VGA pointer, then clears the screen */
 void
 init_video(void)
 {
         textmemptr = (unsigned short *)VGABUFFER;
+//            (unsigned short *)malloc(
+//            sizeof(unsigned short) * SCRN_W * SCRN_H);
+
+//        install_timer_interrupt(5, push_screen);
+
         cls();
 }
